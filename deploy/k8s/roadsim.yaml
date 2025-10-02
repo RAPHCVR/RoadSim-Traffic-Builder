@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: roadsim
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: dns-cloudflare
+  namespace: roadsim
+spec:
+  acme:
+    email: infra@raphcvr.me
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: dns-cloudflare-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roadsim-deployment
+  namespace: roadsim
+  labels:
+    app: roadsim
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: roadsim
+  template:
+    metadata:
+      labels:
+        app: roadsim
+    spec:
+      containers:
+        - name: roadsim-web
+          image: registry.digitalocean.com/team-container/roadsim:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: roadsim-service
+  namespace: roadsim
+  labels:
+    app: roadsim
+spec:
+  selector:
+    app: roadsim
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: roadsim-ingress
+  namespace: roadsim
+  annotations:
+    cert-manager.io/issuer: dns-cloudflare
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: roadsim.raphcvr.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: roadsim-service
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - roadsim.raphcvr.me
+      secretName: roadsim-raphcvr-me-tls
