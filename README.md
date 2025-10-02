@@ -9,7 +9,11 @@ npm install
 npm run dev
 ```
 
-The dev server runs on [http://localhost:5173](http://localhost:5173). For an optimized build:
+The dev server runs on [http://localhost:5173](http://localhost:5173).
+
+Live preview: [https://roadsim.raphcvr.me](https://roadsim.raphcvr.me)
+
+For an optimized build:
 
 ```bash
 npm run build
